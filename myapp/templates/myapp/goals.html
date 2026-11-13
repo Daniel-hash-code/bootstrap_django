@@ -1,0 +1,564 @@
+{% extends "myapp/base.html" %}
+{% load static %}
+
+{% block title %}Goals & Progress — StudyFlow{% endblock %}
+
+{% block topbar_title %}
+  <div>
+    Goals &amp; Progress
+    <div class="sf-topbar-subtitle" id="currentDateDisplay"></div>
+  </div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Page Header -->
+<div class="sf-page-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+  <div>
+    <h1 class="sf-page-title">Goals &amp; Progress</h1>
+    <p class="sf-page-subtitle">Track your academic, personal, and project goals.</p>
+  </div>
+  <button class="sf-btn sf-btn-primary"
+          data-bs-toggle="modal"
+          data-bs-target="#addGoalModal">
+    <i class="bi bi-plus-lg" aria-hidden="true"></i> Add Goal
+  </button>
+</div>
+
+<!-- Overview Stats -->
+<div class="row g-3 mb-4 sf-stagger" id="goalsStatsRow">
+  <div class="col-6 col-md-3">
+    <div class="sf-stat-card text-center" style="padding:var(--space-lg);">
+      <div class="sf-stat-value" id="gStat-total" style="color:var(--color-primary);">0</div>
+      <p class="sf-stat-label">Total Goals</p>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="sf-stat-card text-center" style="padding:var(--space-lg);">
+      <div class="sf-stat-value" id="gStat-completed" style="color:var(--color-success);">0</div>
+      <p class="sf-stat-label">Completed</p>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="sf-stat-card text-center" style="padding:var(--space-lg);">
+      <div class="sf-stat-value" id="gStat-inprogress" style="color:var(--color-warning);">0</div>
+      <p class="sf-stat-label">In Progress</p>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="sf-stat-card text-center" style="padding:var(--space-lg);">
+      <div class="sf-stat-value" id="gStat-avgpct" style="color:var(--color-info);">0%</div>
+      <p class="sf-stat-label">Avg. Progress</p>
+    </div>
+  </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="d-flex gap-2 flex-wrap mb-4" role="group" aria-label="Goal category filter">
+  <button class="sf-badge sf-badge-primary active" style="cursor:pointer; padding:6px 16px;" data-filter="all">All</button>
+  <button class="sf-badge sf-badge-secondary"      style="cursor:pointer; padding:6px 16px;" data-filter="academic">Academic</button>
+  <button class="sf-badge sf-badge-success"        style="cursor:pointer; padding:6px 16px;" data-filter="personal">Personal Dev</button>
+  <button class="sf-badge sf-badge-cyan"           style="cursor:pointer; padding:6px 16px;" data-filter="project">Project</button>
+  <button class="sf-badge sf-badge-warning"        style="cursor:pointer; padding:6px 16px;" data-filter="fitness">Fitness</button>
+  <button class="sf-badge sf-badge-purple"         style="cursor:pointer; padding:6px 16px;" data-filter="skill">Skill</button>
+</div>
+
+<!-- Goals Grid -->
+<div class="row g-4" id="goalsGrid">
+  <!-- Rendered by JavaScript -->
+</div>
+
+
+<!-- ================================================================
+     ADD GOAL MODAL
+     ================================================================ -->
+<div class="modal fade" id="addGoalModal" tabindex="-1"
+     aria-labelledby="addGoalModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addGoalModalLabel">
+          <i class="bi bi-trophy-fill text-primary-color me-2" aria-hidden="true"></i>
+          <span id="goalModalTitle">Add New Goal</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="goalForm" novalidate>
+          <input type="hidden" id="goalId" />
+          <div class="row g-3">
+
+            <div class="col-12">
+              <label class="sf-label" for="goalTitle">Goal Title <span class="text-danger-color">*</span></label>
+              <input type="text" class="sf-input" id="goalTitle"
+                     placeholder="e.g. Achieve Dean's List this semester"
+                     required maxlength="100" />
+            </div>
+
+            <div class="col-12">
+              <label class="sf-label" for="goalDescription">Description</label>
+              <textarea class="sf-textarea" id="goalDescription" rows="2"
+                        placeholder="What does achieving this goal look like? What steps are involved?"
+                        maxlength="400"></textarea>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label class="sf-label" for="goalCategory">Category <span class="text-danger-color">*</span></label>
+              <select class="sf-select" id="goalCategory" required>
+                <option value="">Select category…</option>
+                <option value="academic">🎓 Academic</option>
+                <option value="personal">🌱 Personal Development</option>
+                <option value="project">💻 Project / Portfolio</option>
+                <option value="fitness">🏋️ Fitness & Wellness</option>
+                <option value="skill">🧠 Skill Acquisition</option>
+              </select>
+            </div>
+
+            <div class="col-12 col-md-6">
+              <label class="sf-label" for="goalDueDate">Target Date</label>
+              <input type="date" class="sf-input" id="goalDueDate" />
+            </div>
+
+            <div class="col-12">
+              <label class="sf-label" for="goalProgress">
+                Current Progress: <span id="progressValueDisplay">0%</span>
+              </label>
+              <input type="range" class="form-range" id="goalProgress"
+                     min="0" max="100" step="5" value="0"
+                     aria-label="Goal progress percentage" />
+            </div>
+
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="sf-btn sf-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="sf-btn sf-btn-primary" id="saveGoalBtn">
+          <i class="bi bi-check-lg" aria-hidden="true"></i>
+          <span id="saveGoalBtnText">Save Goal</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Update Progress Modal -->
+<div class="modal fade" id="updateProgressModal" tabindex="-1"
+     aria-labelledby="updateProgressModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="updateProgressModalLabel">
+          <i class="bi bi-graph-up text-primary-color me-2" aria-hidden="true"></i> Update Progress
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-secondary); font-size:var(--font-size-sm);" id="updateProgressGoalName"></p>
+        <label class="sf-label" for="newProgress">Progress: <span id="newProgressDisplay">0%</span></label>
+        <input type="range" class="form-range" id="newProgress"
+               min="0" max="100" step="5" value="0" />
+        <input type="hidden" id="updateProgressGoalId" />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="sf-btn sf-btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="sf-btn sf-btn-primary" id="confirmUpdateProgress">
+          <i class="bi bi-check-lg" aria-hidden="true"></i> Update
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* =============================================================
+   Goals Page JavaScript
+   Handles goal CRUD, progress updates, filtering, and stats.
+   ============================================================= */
+
+/* ---- Category config ---- */
+const GOAL_CATEGORIES = {
+  academic: { label: 'Academic',          icon: '🎓', color: 'var(--color-academic)', bg: 'rgba(99,102,241,0.12)' },
+  personal: { label: 'Personal Dev',      icon: '🌱', color: 'var(--color-personal)', bg: 'rgba(16,185,129,0.12)' },
+  project:  { label: 'Project',           icon: '💻', color: 'var(--color-project)',  bg: 'rgba(6,182,212,0.12)'  },
+  fitness:  { label: 'Fitness',           icon: '🏋️', color: 'var(--color-exercise)', bg: 'rgba(245,158,11,0.12)' },
+  skill:    { label: 'Skill',             icon: '🧠', color: '#8b5cf6',             bg: 'rgba(139,92,246,0.12)' },
+};
+
+function offsetDate(days) {
+  const d = new Date(); d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+/* ---- MOCK goals ---- */
+const MOCK_GOALS = [
+  {
+    id: 'g_1',
+    title: "Make the Dean's List",
+    description: 'Achieve a GPA of 3.8 or above this semester across all modules.',
+    category: 'academic',
+    progress: 72,
+    dueDate: offsetDate(90),
+    completed: false,
+  },
+  {
+    id: 'g_2',
+    title: 'Build a Developer Portfolio',
+    description: 'Complete 3 strong portfolio projects: web app, data visualisation, open-source PR.',
+    category: 'project',
+    progress: 45,
+    dueDate: offsetDate(120),
+    completed: false,
+  },
+  {
+    id: 'g_3',
+    title: 'Run a 10km Race',
+    description: 'Train consistently and complete an official 10km event. Current best: 5km.',
+    category: 'fitness',
+    progress: 60,
+    dueDate: offsetDate(60),
+    completed: false,
+  },
+  {
+    id: 'g_4',
+    title: 'Complete AWS Cloud Practitioner Cert',
+    description: 'Study and sit the AWS Cloud Practitioner certification exam.',
+    category: 'skill',
+    progress: 30,
+    dueDate: offsetDate(45),
+    completed: false,
+  },
+  {
+    id: 'g_5',
+    title: 'Read 12 Books This Year',
+    description: 'One book per month — mix of technical, fiction, and self-development.',
+    category: 'personal',
+    progress: 83,
+    dueDate: offsetDate(49),
+    completed: false,
+  },
+  {
+    id: 'g_6',
+    title: 'Master Python Data Science Stack',
+    description: 'Become comfortable with NumPy, Pandas, Matplotlib, and Scikit-learn.',
+    category: 'skill',
+    progress: 100,
+    dueDate: offsetDate(-10),
+    completed: true,
+  },
+];
+
+let goals     = [];
+let activeFilter = 'all';
+
+function loadGoals() {
+  const saved = StudyFlow.load('goals');
+  goals = saved || [...MOCK_GOALS];
+}
+
+function saveGoals() {
+  StudyFlow.save('goals', goals);
+}
+
+function escapeHtml(str) {
+  const map = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' };
+  return String(str).replace(/[&<>"']/g, m => map[m]);
+}
+
+/* ---- Determine progress bar colour class ---- */
+function progressClass(pct) {
+  if (pct >= 100) return 'success';
+  if (pct >= 60)  return '';         // default (primary gradient)
+  if (pct >= 30)  return 'warning';
+  return 'danger';
+}
+
+/* ---- Format due date ---- */
+function formatDue(str) {
+  if (!str) return 'No deadline';
+  const d    = new Date(str + 'T00:00:00');
+  const now  = new Date();
+  const diff = Math.round((d - now) / 86400000);
+  if (diff < 0)  return `<span class="text-danger-color">${Math.abs(diff)}d overdue</span>`;
+  if (diff === 0) return '<span class="text-warning-color">Due today</span>';
+  if (diff <= 7) return `<span class="text-warning-color">${diff}d left</span>`;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/* ---- Build a goal card ---- */
+function buildGoalCard(goal) {
+  const cat  = GOAL_CATEGORIES[goal.category] || GOAL_CATEGORIES.academic;
+  const pct  = Math.min(100, Math.max(0, goal.progress));
+  const pClass = progressClass(pct);
+
+  const col = document.createElement('div');
+  col.className = 'col-12 col-md-6 col-xl-4';
+  col.dataset.id = goal.id;
+
+  col.innerHTML = `
+    <div class="sf-goal-card">
+
+      <div class="sf-goal-card-top">
+        <div class="sf-goal-icon" style="background:${cat.bg}; color:${cat.color};">
+          ${cat.icon}
+        </div>
+        <div class="d-flex flex-column align-items-end gap-1">
+          <span class="sf-badge" style="background:${cat.bg}; color:${cat.color};">${cat.label}</span>
+          ${goal.completed
+            ? '<span class="sf-badge sf-badge-success"><i class="bi bi-check-circle-fill" aria-hidden="true"></i> Completed</span>'
+            : ''}
+        </div>
+      </div>
+
+      <h3 class="sf-goal-title">${escapeHtml(goal.title)}</h3>
+      <p class="sf-goal-description">${escapeHtml(goal.description || '')}</p>
+
+      <div class="sf-goal-progress-label">
+        <span style="color:var(--text-secondary);">Progress</span>
+        <span style="color:${cat.color}; font-weight:700;">${pct}%</span>
+      </div>
+      <div class="sf-progress">
+        <div class="sf-progress-bar ${pClass}"
+             style="width:${pct}%; ${pClass === '' ? `background:linear-gradient(90deg,${cat.color},${cat.color}99)` : ''}"
+             role="progressbar"
+             aria-valuenow="${pct}"
+             aria-valuemin="0"
+             aria-valuemax="100"
+             aria-label="${pct}% complete"></div>
+      </div>
+
+      <div class="sf-goal-due">
+        <i class="bi bi-calendar3" aria-hidden="true"></i>
+        ${formatDue(goal.dueDate)}
+      </div>
+
+      <!-- Action buttons -->
+      <div class="d-flex gap-2 mt-3 pt-3" style="border-top:1px solid var(--border-color);">
+        <button class="sf-btn sf-btn-ghost sf-btn-sm flex-grow-1"
+                data-action="update-progress" data-id="${goal.id}"
+                ${goal.completed ? 'disabled' : ''}
+                aria-label="Update progress">
+          <i class="bi bi-graph-up" aria-hidden="true"></i> Update
+        </button>
+        <button class="sf-btn-icon sf-btn" data-action="edit-goal" data-id="${goal.id}"
+                title="Edit goal" aria-label="Edit goal">
+          <i class="bi bi-pencil" aria-hidden="true"></i>
+        </button>
+        <button class="sf-btn-icon sf-btn" data-action="delete-goal" data-id="${goal.id}"
+                title="Delete goal" aria-label="Delete goal"
+                style="color:var(--color-danger);">
+          <i class="bi bi-trash" aria-hidden="true"></i>
+        </button>
+      </div>
+
+    </div>`;
+
+  return col;
+}
+
+/* ---- Render goals grid ---- */
+function renderGoals() {
+  const grid = document.getElementById('goalsGrid');
+  const filtered = goals.filter(g =>
+    activeFilter === 'all' || g.category === activeFilter
+  );
+
+  if (filtered.length === 0) {
+    grid.innerHTML = `
+      <div class="col-12">
+        <div class="sf-empty-state">
+          <div class="sf-empty-icon"><i class="bi bi-trophy" aria-hidden="true"></i></div>
+          <div class="sf-empty-title">No goals yet</div>
+          <p class="sf-empty-text">Add your first goal to start tracking your progress!</p>
+        </div>
+      </div>`;
+    updateStats();
+    return;
+  }
+
+  // Sort: incomplete first, then by progress descending
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    return b.progress - a.progress;
+  });
+
+  grid.innerHTML = '';
+  sorted.forEach(g => grid.appendChild(buildGoalCard(g)));
+  updateStats();
+}
+
+/* ---- Update stats ---- */
+function updateStats() {
+  const total     = goals.length;
+  const completed = goals.filter(g => g.completed).length;
+  const inProgress = goals.filter(g => !g.completed).length;
+  const avgPct    = total
+    ? Math.round(goals.reduce((s, g) => s + g.progress, 0) / total)
+    : 0;
+
+  document.getElementById('gStat-total').textContent      = total;
+  document.getElementById('gStat-completed').textContent  = completed;
+  document.getElementById('gStat-inprogress').textContent = inProgress;
+  document.getElementById('gStat-avgpct').textContent     = avgPct + '%';
+}
+
+/* ---- Open "Add Goal" modal ---- */
+function openAddGoalModal() {
+  document.getElementById('goalId').value           = '';
+  document.getElementById('goalTitle').value         = '';
+  document.getElementById('goalDescription').value   = '';
+  document.getElementById('goalCategory').value      = '';
+  document.getElementById('goalDueDate').value        = '';
+  document.getElementById('goalProgress').value       = 0;
+  document.getElementById('progressValueDisplay').textContent = '0%';
+  document.getElementById('goalModalTitle').textContent   = 'Add New Goal';
+  document.getElementById('saveGoalBtnText').textContent  = 'Save Goal';
+}
+
+/* ---- Open "Edit Goal" modal ---- */
+function openEditGoalModal(id) {
+  const g = goals.find(x => x.id === id);
+  if (!g) return;
+  document.getElementById('goalId').value           = g.id;
+  document.getElementById('goalTitle').value         = g.title;
+  document.getElementById('goalDescription').value   = g.description || '';
+  document.getElementById('goalCategory').value      = g.category;
+  document.getElementById('goalDueDate').value        = g.dueDate || '';
+  document.getElementById('goalProgress').value       = g.progress;
+  document.getElementById('progressValueDisplay').textContent = g.progress + '%';
+  document.getElementById('goalModalTitle').textContent   = 'Edit Goal';
+  document.getElementById('saveGoalBtnText').textContent  = 'Save Changes';
+  const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('addGoalModal'));
+  modal.show();
+}
+
+/* ---- Save (add or edit) a goal ---- */
+function saveGoal() {
+  const title    = document.getElementById('goalTitle').value.trim();
+  const category = document.getElementById('goalCategory').value;
+  if (!title) {
+    StudyFlow.toast('Please enter a goal title.', 'warning');
+    return;
+  }
+  if (!category) {
+    StudyFlow.toast('Please select a category.', 'warning');
+    return;
+  }
+
+  const id       = document.getElementById('goalId').value;
+  const progress = parseInt(document.getElementById('goalProgress').value) || 0;
+
+  const goalData = {
+    id:          id || StudyFlow.generateId(),
+    title,
+    description: document.getElementById('goalDescription').value.trim(),
+    category,
+    dueDate:     document.getElementById('goalDueDate').value || '',
+    progress,
+    completed:   progress >= 100,
+  };
+
+  if (id) {
+    const idx = goals.findIndex(g => g.id === id);
+    goals[idx] = goalData;
+    StudyFlow.toast('Goal updated! 🎯', 'success');
+  } else {
+    goals.push(goalData);
+    StudyFlow.toast('Goal added! 🏆', 'success');
+  }
+
+  saveGoals();
+  renderGoals();
+  bootstrap.Modal.getInstance(document.getElementById('addGoalModal')).hide();
+}
+
+/* ---- Update progress only ---- */
+function openUpdateProgressModal(id) {
+  const g = goals.find(x => x.id === id);
+  if (!g) return;
+  document.getElementById('updateProgressGoalId').value  = id;
+  document.getElementById('updateProgressGoalName').textContent = g.title;
+  document.getElementById('newProgress').value           = g.progress;
+  document.getElementById('newProgressDisplay').textContent    = g.progress + '%';
+  const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('updateProgressModal'));
+  modal.show();
+}
+
+function executeUpdateProgress() {
+  const id  = document.getElementById('updateProgressGoalId').value;
+  const pct = parseInt(document.getElementById('newProgress').value) || 0;
+  const idx = goals.findIndex(g => g.id === id);
+  if (idx === -1) return;
+  goals[idx].progress  = pct;
+  goals[idx].completed = pct >= 100;
+  saveGoals();
+  renderGoals();
+  bootstrap.Modal.getInstance(document.getElementById('updateProgressModal')).hide();
+  StudyFlow.toast(
+    pct >= 100 ? 'Goal completed! 🎉 Congratulations!' : `Progress updated to ${pct}%`,
+    pct >= 100 ? 'success' : 'info'
+  );
+}
+
+/* ---- Delete goal ---- */
+function deleteGoal(id) {
+  if (!confirm('Delete this goal? This cannot be undone.')) return;
+  goals = goals.filter(g => g.id !== id);
+  saveGoals();
+  renderGoals();
+  StudyFlow.toast('Goal deleted.', 'info');
+}
+
+/* ---- WIRE UP ---- */
+document.addEventListener('DOMContentLoaded', () => {
+
+  loadGoals();
+  renderGoals();
+
+  // "Add Goal" modal — clear form when opened via button
+  document.getElementById('addGoalModal').addEventListener('show.bs.modal', e => {
+    if (e.relatedTarget) openAddGoalModal();
+  });
+
+  // Progress slider live display (Add/Edit modal)
+  document.getElementById('goalProgress').addEventListener('input', function () {
+    document.getElementById('progressValueDisplay').textContent = this.value + '%';
+  });
+
+  // Progress slider live display (Update modal)
+  document.getElementById('newProgress').addEventListener('input', function () {
+    document.getElementById('newProgressDisplay').textContent = this.value + '%';
+  });
+
+  // Save goal
+  document.getElementById('saveGoalBtn').addEventListener('click', saveGoal);
+
+  // Confirm update progress
+  document.getElementById('confirmUpdateProgress').addEventListener('click', executeUpdateProgress);
+
+  // Category filter tabs
+  document.querySelectorAll('[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeFilter = btn.dataset.filter;
+      document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderGoals();
+    });
+  });
+
+  // Delegate clicks in goals grid
+  document.getElementById('goalsGrid').addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const { action, id } = btn.dataset;
+    if (action === 'update-progress') openUpdateProgressModal(id);
+    if (action === 'edit-goal')       openEditGoalModal(id);
+    if (action === 'delete-goal')     deleteGoal(id);
+  });
+
+});
+</script>
+{% endblock %}

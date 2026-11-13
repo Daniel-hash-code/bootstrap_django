@@ -1,0 +1,591 @@
+{% extends "myapp/base.html" %}
+{% load static %}
+
+{% block title %}Journal — StudyFlow{% endblock %}
+
+{% block topbar_title %}
+  <div>
+    Journal
+    <div class="sf-topbar-subtitle" id="currentDateDisplay"></div>
+  </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Calm writing-mode background */
+  #writePanel {
+    background: linear-gradient(135deg, var(--bg-surface), var(--bg-surface-alt));
+  }
+
+  .sf-journal-editor:focus-within {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  }
+
+  /* Tags */
+  .sf-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    background: var(--bg-surface-alt);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .sf-tag:hover, .sf-tag.active {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="row g-4">
+
+  <!-- ── LEFT: Write / New Entry panel ── -->
+  <div class="col-12 col-lg-5">
+
+    <div class="sf-card" id="writePanel">
+      <div class="sf-card-header">
+        <h1 class="sf-card-title" style="font-size:var(--font-size-base);">
+          <i class="bi bi-pencil-square text-primary-color" aria-hidden="true"></i>
+          <span id="writePanelTitle">New Entry</span>
+        </h1>
+        <button class="sf-btn sf-btn-ghost sf-btn-sm" id="clearEntryBtn" aria-label="Clear form">
+          <i class="bi bi-x" aria-hidden="true"></i> Clear
+        </button>
+      </div>
+      <div class="sf-card-body">
+
+        <!-- Hidden ID for editing -->
+        <input type="hidden" id="entryId" />
+
+        <!-- Entry Title -->
+        <div class="sf-form-group">
+          <label class="sf-label" for="entryTitle">Title</label>
+          <input type="text" class="sf-input" id="entryTitle"
+                 placeholder="Give this entry a title…"
+                 maxlength="80" />
+        </div>
+
+        <!-- Date and Mood row -->
+        <div class="row g-3 mb-3">
+          <div class="col-7">
+            <label class="sf-label" for="entryDate">Date</label>
+            <input type="date" class="sf-input" id="entryDate" />
+          </div>
+          <div class="col-5">
+            <label class="sf-label">Mood</label>
+            <div style="font-size:1.6rem; cursor:default;" id="selectedMoodDisplay" aria-live="polite">😐</div>
+          </div>
+        </div>
+
+        <!-- Mood Selector -->
+        <div class="sf-form-group">
+          <label class="sf-label">How are you feeling?</label>
+          <div class="sf-mood-selector" role="group" aria-label="Mood selector">
+            <button class="sf-mood-btn" data-mood="😄" data-label="Happy" title="Happy" aria-label="Happy">
+              <span>😄</span><span>Happy</span>
+            </button>
+            <button class="sf-mood-btn" data-mood="😌" data-label="Calm" title="Calm" aria-label="Calm">
+              <span>😌</span><span>Calm</span>
+            </button>
+            <button class="sf-mood-btn" data-mood="😐" data-label="Neutral" title="Neutral" aria-label="Neutral">
+              <span>😐</span><span>Neutral</span>
+            </button>
+            <button class="sf-mood-btn" data-mood="😤" data-label="Stressed" title="Stressed" aria-label="Stressed">
+              <span>😤</span><span>Stressed</span>
+            </button>
+            <button class="sf-mood-btn" data-mood="😴" data-label="Tired" title="Tired" aria-label="Tired">
+              <span>😴</span><span>Tired</span>
+            </button>
+            <button class="sf-mood-btn" data-mood="🤩" data-label="Excited" title="Excited" aria-label="Excited">
+              <span>🤩</span><span>Excited</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Journal Content (distraction-free writing area) -->
+        <div class="sf-form-group">
+          <label class="sf-label" for="entryContent">Your thoughts…</label>
+          <div class="sf-journal-editor">
+            <textarea class="sf-editor-textarea"
+                      id="entryContent"
+                      placeholder="Write freely here. This is your space — no one is judging. What happened today? What did you learn? What are you grateful for?"
+                      rows="10"
+                      maxlength="5000"
+                      aria-describedby="charCount"></textarea>
+            <div class="d-flex justify-content-end mt-2">
+              <span id="charCount" style="font-size:var(--font-size-xs); color:var(--text-muted);">0 / 5000</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Save button -->
+        <button class="sf-btn sf-btn-primary w-100" id="saveEntryBtn">
+          <i class="bi bi-save" aria-hidden="true"></i>
+          <span id="saveEntryBtnText">Save Entry</span>
+        </button>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT: Previous Entries ── -->
+  <div class="col-12 col-lg-7">
+
+    <!-- Search and filter bar -->
+    <div class="sf-card mb-4">
+      <div class="sf-card-body">
+        <div class="row g-3">
+          <div class="col-12 col-sm-7">
+            <div class="sf-search-wrapper">
+              <i class="bi bi-search sf-search-icon" aria-hidden="true"></i>
+              <input type="search"
+                     class="sf-input sf-search-input"
+                     id="journalSearch"
+                     placeholder="Search journal entries…"
+                     aria-label="Search journal entries" />
+            </div>
+          </div>
+          <div class="col-12 col-sm-5">
+            <select class="sf-select" id="journalMoodFilter" aria-label="Filter by mood">
+              <option value="all">All Moods</option>
+              <option value="😄">😄 Happy</option>
+              <option value="😌">😌 Calm</option>
+              <option value="😐">😐 Neutral</option>
+              <option value="😤">😤 Stressed</option>
+              <option value="😴">😴 Tired</option>
+              <option value="🤩">🤩 Excited</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Tag filters -->
+        <div class="d-flex flex-wrap gap-2 mt-3" id="tagFilters" role="group" aria-label="Tag filters">
+          <button class="sf-tag active" data-tag="all">All Entries</button>
+          <button class="sf-tag" data-tag="study">Study</button>
+          <button class="sf-tag" data-tag="wellness">Wellness</button>
+          <button class="sf-tag" data-tag="project">Project</button>
+          <button class="sf-tag" data-tag="gratitude">Gratitude</button>
+          <button class="sf-tag" data-tag="goals">Goals</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Journal entries header -->
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h2 style="font-size:var(--font-size-base); font-weight:700; color:var(--text-primary); margin:0;">
+        Previous Entries
+        <span class="sf-badge sf-badge-primary ms-1" id="journalCount">0</span>
+      </h2>
+      <span style="font-size:var(--font-size-xs); color:var(--text-muted);" id="journalResultInfo"></span>
+    </div>
+
+    <!-- Entries grid -->
+    <div id="entriesContainer" class="row g-3">
+      <!-- Rendered by JS -->
+    </div>
+
+  </div>
+</div>
+
+<!-- ── View Entry Modal ── -->
+<div class="modal fade" id="viewEntryModal" tabindex="-1"
+     aria-labelledby="viewEntryModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="viewEntryModalLabel">
+          <span id="viewEntryMood" aria-hidden="true" style="font-size:1.3rem;"></span>
+          <span id="viewEntryTitle" class="ms-2"></span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:var(--font-size-xs); color:var(--text-muted); margin-bottom:var(--space-md);" id="viewEntryDate"></p>
+        <div id="viewEntryContent"
+             style="font-family:'Georgia',serif; font-size:1.05rem; line-height:1.9; color:var(--text-primary); white-space:pre-wrap;">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="sf-btn sf-btn-ghost" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="sf-btn" id="editEntryFromModal"
+                style="background:var(--color-primary); color:white;">
+          <i class="bi bi-pencil" aria-hidden="true"></i> Edit Entry
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* =============================================================
+   Journal Page JavaScript
+   Handles: mock entries, rendering cards, writing, editing,
+   deleting, searching, filtering by mood and tag.
+   ============================================================= */
+
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+function offsetDate(days) {
+  const d = new Date(); d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+/* ---- MOCK journal entries ---- */
+const MOCK_ENTRIES = [
+  {
+    id: 'je_1',
+    title: 'A productive Monday',
+    date: todayStr(),
+    mood: '😄',
+    moodLabel: 'Happy',
+    content: `Today was genuinely productive. I finished the Data Structures lecture notes by 10am and felt really good about it. The binary tree section clicked for me finally — drawing out the rotations on paper helped a lot.\n\nI also managed to squeeze in a 5km run before breakfast. Cold morning, but worth it.\n\nMy main goal for the rest of the week is to get through the Linear Algebra problem set and start the portfolio project. I feel like momentum is building.`,
+    tags: ['study', 'wellness'],
+  },
+  {
+    id: 'je_2',
+    title: 'React hooks finally make sense',
+    date: offsetDate(-1),
+    mood: '🤩',
+    moodLabel: 'Excited',
+    content: `Something clicked today while going through chapter 5 of the React tutorial. I finally understand why useEffect exists and how to use the dependency array correctly.\n\nI spent an extra hour just experimenting in a small sandbox project. It's one of those learning moments that makes me remember why I love programming.\n\nFiled away a bunch of bookmarks for further reading on React performance optimisation.`,
+    tags: ['project', 'goals'],
+  },
+  {
+    id: 'je_3',
+    title: 'Exam anxiety and how I managed it',
+    date: offsetDate(-3),
+    mood: '😤',
+    moodLabel: 'Stressed',
+    content: `The algorithms exam is next week and I'm feeling the pressure. I know the material, but the time pressure in exams always gets to me.\n\nI decided to do a full practice exam under timed conditions tonight. I didn't finish all the questions, but I got much further than expected.\n\nI'm going to review the ones I struggled with tomorrow morning when my mind is fresh. One day at a time.`,
+    tags: ['study', 'wellness'],
+  },
+  {
+    id: 'je_4',
+    title: 'Gratitude for small things',
+    date: offsetDate(-5),
+    mood: '😌',
+    moodLabel: 'Calm',
+    content: `No big accomplishments today, just a calm and steady day. I did some reading, went for a walk, and had a good conversation with my housemates about our goals.\n\nSometimes the best days are the quiet ones. I'm grateful for a stable routine, access to good learning materials, and people around me who care.\n\nReminder to self: consistency over intensity.`,
+    tags: ['gratitude', 'wellness'],
+  },
+  {
+    id: 'je_5',
+    title: 'Portfolio planning session',
+    date: offsetDate(-7),
+    mood: '😄',
+    moodLabel: 'Happy',
+    content: `Spent the afternoon planning what my developer portfolio should include. I sketched out the structure on paper: about me, projects, blog (maybe), contact.\n\nI want three solid projects: a full-stack web app, a data visualisation project, and an open-source contribution. The StudyFlow app I'm building now could be one of them!\n\nThis exercise made me realise how much I've already built. I should give myself more credit.`,
+    tags: ['project', 'goals', 'gratitude'],
+  },
+];
+
+let entries    = [];
+let selectedMood = '😐';
+let activeTag    = 'all';
+let viewingId    = null;
+
+/* ---- Load entries ---- */
+function loadEntries() {
+  const saved = StudyFlow.load('journal_entries');
+  entries = saved || [...MOCK_ENTRIES];
+}
+
+function saveEntries() {
+  StudyFlow.save('journal_entries', entries);
+}
+
+/* ---- Format date for display ---- */
+function displayDate(str) {
+  const today   = todayStr();
+  const ystr    = offsetDate(-1);
+  if (str === today) return 'Today';
+  if (str === ystr)  return 'Yesterday';
+  return new Date(str + 'T00:00:00').toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  });
+}
+
+/* ---- Escape HTML ---- */
+function escapeHtml(str) {
+  const map = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' };
+  return String(str).replace(/[&<>"']/g, m => map[m]);
+}
+
+/* ---- Build a journal card element ---- */
+function buildEntryCard(entry) {
+  const col = document.createElement('div');
+  col.className = 'col-12 col-md-6';
+
+  const preview = entry.content.length > 160
+    ? entry.content.slice(0, 157) + '…'
+    : entry.content;
+
+  const tagBadges = (entry.tags || [])
+    .map(t => `<span class="sf-badge sf-badge-secondary">${t}</span>`)
+    .join(' ');
+
+  col.innerHTML = `
+    <div class="sf-journal-card" data-id="${entry.id}" role="article" tabindex="0"
+         aria-label="Journal entry: ${escapeHtml(entry.title)}">
+
+      <div class="d-flex align-items-start justify-content-between mb-2">
+        <div class="d-flex align-items-center gap-2">
+          <span class="sf-mood-emoji" title="${entry.moodLabel}" aria-label="Mood: ${entry.moodLabel}">${entry.mood}</span>
+          <div>
+            <div style="font-size:var(--font-size-sm); font-weight:700; color:var(--text-primary);">${escapeHtml(entry.title)}</div>
+            <div style="font-size:var(--font-size-xs); color:var(--text-muted);">${displayDate(entry.date)}</div>
+          </div>
+        </div>
+        <div class="d-flex gap-1">
+          <button class="sf-btn-icon sf-btn" data-action="edit-card" data-id="${entry.id}"
+                  title="Edit entry" aria-label="Edit entry">
+            <i class="bi bi-pencil" aria-hidden="true"></i>
+          </button>
+          <button class="sf-btn-icon sf-btn" data-action="delete-entry" data-id="${entry.id}"
+                  title="Delete entry" aria-label="Delete entry"
+                  style="color:var(--color-danger);">
+            <i class="bi bi-trash" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+
+      <p class="sf-journal-preview mb-2">${escapeHtml(preview)}</p>
+
+      <div class="d-flex flex-wrap gap-1">${tagBadges}</div>
+    </div>`;
+
+  return col;
+}
+
+/* ---- Get filtered entries ---- */
+function getFilteredEntries() {
+  const search = document.getElementById('journalSearch').value.toLowerCase();
+  const mood   = document.getElementById('journalMoodFilter').value;
+
+  return entries.filter(e => {
+    const matchSearch = !search
+      || e.title.toLowerCase().includes(search)
+      || e.content.toLowerCase().includes(search);
+    const matchMood = mood === 'all' || e.mood === mood;
+    const matchTag  = activeTag === 'all' || (e.tags || []).includes(activeTag);
+    return matchSearch && matchMood && matchTag;
+  }).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+/* ---- Render entries ---- */
+function renderEntries() {
+  const container = document.getElementById('entriesContainer');
+  const filtered  = getFilteredEntries();
+
+  document.getElementById('journalCount').textContent = filtered.length;
+  document.getElementById('journalResultInfo').textContent =
+    filtered.length !== entries.length ? `Showing ${filtered.length} of ${entries.length}` : '';
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="col-12">
+        <div class="sf-empty-state">
+          <div class="sf-empty-icon"><i class="bi bi-book" aria-hidden="true"></i></div>
+          <div class="sf-empty-title">No entries found</div>
+          <p class="sf-empty-text">Try a different search or write your first entry!</p>
+        </div>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = '';
+  filtered.forEach(e => container.appendChild(buildEntryCard(e)));
+}
+
+/* ---- Set the form for a NEW entry ---- */
+function resetForm() {
+  document.getElementById('entryId').value         = '';
+  document.getElementById('entryTitle').value       = '';
+  document.getElementById('entryDate').value        = todayStr();
+  document.getElementById('entryContent').value     = '';
+  document.getElementById('charCount').textContent  = '0 / 5000';
+  selectedMood = '😐';
+  document.getElementById('selectedMoodDisplay').textContent = selectedMood;
+  document.querySelectorAll('.sf-mood-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('writePanelTitle').textContent    = 'New Entry';
+  document.getElementById('saveEntryBtnText').textContent   = 'Save Entry';
+}
+
+/* ---- Populate form for EDITING ---- */
+function editEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  document.getElementById('entryId').value         = e.id;
+  document.getElementById('entryTitle').value       = e.title;
+  document.getElementById('entryDate').value        = e.date;
+  document.getElementById('entryContent').value     = e.content;
+  document.getElementById('charCount').textContent  = `${e.content.length} / 5000`;
+  selectedMood = e.mood;
+  document.getElementById('selectedMoodDisplay').textContent = e.mood;
+  document.querySelectorAll('.sf-mood-btn').forEach(b => {
+    b.classList.toggle('selected', b.dataset.mood === e.mood);
+  });
+  document.getElementById('writePanelTitle').textContent   = 'Edit Entry';
+  document.getElementById('saveEntryBtnText').textContent  = 'Save Changes';
+  // Scroll the write panel into view on mobile
+  document.getElementById('writePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ---- Save (add or update) an entry ---- */
+function saveEntry() {
+  const title   = document.getElementById('entryTitle').value.trim() || 'Untitled';
+  const date    = document.getElementById('entryDate').value || todayStr();
+  const content = document.getElementById('entryContent').value.trim();
+  const id      = document.getElementById('entryId').value;
+
+  if (!content) {
+    StudyFlow.toast('Please write something before saving!', 'warning');
+    document.getElementById('entryContent').focus();
+    return;
+  }
+
+  const moodBtns   = document.querySelectorAll('.sf-mood-btn.selected');
+  const moodLabel  = moodBtns.length ? moodBtns[0].dataset.label : 'Neutral';
+
+  const entryData = {
+    id:        id || StudyFlow.generateId(),
+    title,
+    date,
+    mood:      selectedMood,
+    moodLabel,
+    content,
+    tags:      [],   // Could be extended with a tag picker
+  };
+
+  if (id) {
+    // Keep existing tags when editing
+    const existing = entries.find(e => e.id === id);
+    if (existing) entryData.tags = existing.tags || [];
+    const idx = entries.findIndex(e => e.id === id);
+    entries[idx] = entryData;
+    StudyFlow.toast('Entry updated! ✏️', 'success');
+  } else {
+    entries.unshift(entryData);  // newest first
+    StudyFlow.toast('Journal entry saved! 📖', 'success');
+  }
+
+  saveEntries();
+  renderEntries();
+  resetForm();
+}
+
+/* ---- Delete entry ---- */
+function deleteEntry(id) {
+  if (!confirm('Delete this journal entry? This cannot be undone.')) return;
+  entries = entries.filter(e => e.id !== id);
+  saveEntries();
+  renderEntries();
+  StudyFlow.toast('Entry deleted.', 'info');
+}
+
+/* ---- View entry in modal ---- */
+function viewEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  viewingId = id;
+  document.getElementById('viewEntryMood').textContent    = e.mood;
+  document.getElementById('viewEntryTitle').textContent   = e.title;
+  document.getElementById('viewEntryDate').textContent    = displayDate(e.date);
+  document.getElementById('viewEntryContent').textContent = e.content;
+  const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('viewEntryModal'));
+  modal.show();
+}
+
+/* ---- WIRE UP ---- */
+document.addEventListener('DOMContentLoaded', () => {
+
+  // Set today's date as default
+  document.getElementById('entryDate').value = todayStr();
+
+  loadEntries();
+  renderEntries();
+
+  // Character counter
+  document.getElementById('entryContent').addEventListener('input', function () {
+    document.getElementById('charCount').textContent = `${this.value.length} / 5000`;
+  });
+
+  // Mood buttons
+  document.querySelectorAll('.sf-mood-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.sf-mood-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedMood = btn.dataset.mood;
+      document.getElementById('selectedMoodDisplay').textContent = selectedMood;
+    });
+  });
+
+  // Save button
+  document.getElementById('saveEntryBtn').addEventListener('click', saveEntry);
+
+  // Clear / new entry
+  document.getElementById('clearEntryBtn').addEventListener('click', resetForm);
+
+  // Search + mood filter
+  document.getElementById('journalSearch').addEventListener('input', renderEntries);
+  document.getElementById('journalMoodFilter').addEventListener('change', renderEntries);
+
+  // Tag filter buttons
+  document.getElementById('tagFilters').addEventListener('click', (e) => {
+    const tag = e.target.closest('[data-tag]');
+    if (!tag) return;
+    activeTag = tag.dataset.tag;
+    document.querySelectorAll('[data-tag]').forEach(t => t.classList.remove('active'));
+    tag.classList.add('active');
+    renderEntries();
+  });
+
+  // Click / keyboard on entry cards (view or action buttons)
+  document.getElementById('entriesContainer').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (btn) {
+      e.stopPropagation();
+      const { action, id } = btn.dataset;
+      if (action === 'edit-card')     editEntry(id);
+      if (action === 'delete-entry')  deleteEntry(id);
+      return;
+    }
+    // Click on card → open view modal
+    const card = e.target.closest('.sf-journal-card');
+    if (card) viewEntry(card.dataset.id);
+  });
+
+  document.getElementById('entriesContainer').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const card = e.target.closest('.sf-journal-card');
+      if (card) viewEntry(card.dataset.id);
+    }
+  });
+
+  // "Edit" from view modal
+  document.getElementById('editEntryFromModal').addEventListener('click', () => {
+    if (viewingId) {
+      bootstrap.Modal.getInstance(document.getElementById('viewEntryModal')).hide();
+      editEntry(viewingId);
+    }
+  });
+
+});
+</script>
+{% endblock %}

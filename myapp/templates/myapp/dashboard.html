@@ -1,0 +1,496 @@
+{% extends "myapp/base.html" %}
+{% load static %}
+
+{% block title %}Dashboard — StudyFlow{% endblock %}
+
+{% block topbar_title %}
+  <div>
+    Dashboard
+    <div class="sf-topbar-subtitle" id="currentDateDisplay"></div>
+  </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Productivity ring chart (simple CSS circle) */
+  .sf-ring-chart {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--color-primary) 0% var(--ring-pct, 0%),
+      var(--bg-surface-alt) var(--ring-pct, 0%) 100%
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .sf-ring-inner {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background-color: var(--bg-card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+
+  /* Weekly bar chart */
+  .sf-bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-sm);
+    height: 100px;
+    padding-top: var(--space-sm);
+  }
+
+  .sf-bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    justify-content: flex-end;
+  }
+
+  .sf-bar {
+    width: 100%;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    background: linear-gradient(to top, var(--color-primary), var(--color-primary-light));
+    transition: height 0.6s ease;
+    min-height: 4px;
+  }
+
+  .sf-bar-label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .sf-bar-value {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+
+  /* Today bar highlight */
+  .sf-bar.today {
+    background: linear-gradient(to top, var(--color-secondary), #67e8f9);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Welcome Banner -->
+<div class="sf-welcome-banner sf-fade-in">
+  <div class="row align-items-center">
+    <div class="col-12 col-md-8">
+      <h1 class="sf-welcome-title" id="welcomeHeading">Good morning, Alex! 👋</h1>
+      <p class="sf-welcome-subtitle">
+        You have <strong id="pendingCount">5</strong> activities planned for today.
+        Keep up the momentum!
+      </p>
+      <blockquote class="sf-welcome-quote" id="motivationalQuote">
+        "An investment in knowledge pays the best interest." — Benjamin Franklin
+      </blockquote>
+    </div>
+    <div class="col-12 col-md-4 text-center mt-3 mt-md-0">
+      <div class="d-flex justify-content-center justify-content-md-end gap-3">
+        <a href="{% url 'myapp:planner' %}" class="sf-btn sf-btn-primary">
+          <i class="bi bi-plus-lg" aria-hidden="true"></i> Add Activity
+        </a>
+        <a href="{% url 'myapp:journal' %}" class="sf-btn" style="background:rgba(255,255,255,0.2); color:white;">
+          <i class="bi bi-pencil" aria-hidden="true"></i> New Entry
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── STAT CARDS ── -->
+<div class="row g-3 mb-4 sf-stagger">
+
+  <!-- Planned Today -->
+  <div class="col-6 col-lg-3">
+    <div class="sf-stat-card">
+      <div class="sf-stat-card-accent" style="background: linear-gradient(90deg,var(--color-primary),var(--color-primary-light));"></div>
+      <div class="sf-stat-icon" style="background:rgba(99,102,241,0.12); color:var(--color-primary);">
+        <i class="bi bi-calendar-check" aria-hidden="true"></i>
+      </div>
+      <div class="sf-stat-value" id="statPlanned">8</div>
+      <p class="sf-stat-label">Planned Today</p>
+      <div class="sf-stat-change positive">
+        <i class="bi bi-arrow-up-short" aria-hidden="true"></i> 2 more than yesterday
+      </div>
+    </div>
+  </div>
+
+  <!-- Completed -->
+  <div class="col-6 col-lg-3">
+    <div class="sf-stat-card">
+      <div class="sf-stat-card-accent" style="background: linear-gradient(90deg,var(--color-success),#34d399);"></div>
+      <div class="sf-stat-icon" style="background:rgba(16,185,129,0.12); color:var(--color-success);">
+        <i class="bi bi-check-circle" aria-hidden="true"></i>
+      </div>
+      <div class="sf-stat-value" id="statCompleted">3</div>
+      <p class="sf-stat-label">Completed</p>
+      <div class="sf-stat-change positive">
+        <i class="bi bi-arrow-up-short" aria-hidden="true"></i> 37.5% done
+      </div>
+    </div>
+  </div>
+
+  <!-- Study Hours -->
+  <div class="col-6 col-lg-3">
+    <div class="sf-stat-card">
+      <div class="sf-stat-card-accent" style="background: linear-gradient(90deg,var(--color-secondary),#67e8f9);"></div>
+      <div class="sf-stat-icon" style="background:rgba(6,182,212,0.12); color:var(--color-secondary);">
+        <i class="bi bi-clock-history" aria-hidden="true"></i>
+      </div>
+      <div class="sf-stat-value" id="statHours">4.5</div>
+      <p class="sf-stat-label">Study Hours</p>
+      <div class="sf-stat-change positive">
+        <i class="bi bi-arrow-up-short" aria-hidden="true"></i> Target: 6h
+      </div>
+    </div>
+  </div>
+
+  <!-- Streak -->
+  <div class="col-6 col-lg-3">
+    <div class="sf-stat-card">
+      <div class="sf-stat-card-accent" style="background: linear-gradient(90deg,var(--color-warning),#fcd34d);"></div>
+      <div class="sf-stat-icon" style="background:rgba(245,158,11,0.12); color:var(--color-warning);">
+        <i class="bi bi-fire" aria-hidden="true"></i>
+      </div>
+      <div class="sf-stat-value">12</div>
+      <p class="sf-stat-label">Day Streak 🔥</p>
+      <div class="sf-stat-change positive">
+        <i class="bi bi-arrow-up-short" aria-hidden="true"></i> Personal best!
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── MAIN CONTENT ROW ── -->
+<div class="row g-4 mb-4">
+
+  <!-- Left column: Today's Schedule + Weekly Progress -->
+  <div class="col-12 col-lg-8">
+
+    <!-- Today's Activities -->
+    <div class="sf-card mb-4">
+      <div class="sf-card-header">
+        <h2 class="sf-card-title">
+          <i class="bi bi-list-task text-primary-color" aria-hidden="true"></i>
+          Today's Activities
+        </h2>
+        <a href="{% url 'myapp:planner' %}" class="sf-btn sf-btn-ghost sf-btn-sm">
+          View all <i class="bi bi-arrow-right" aria-hidden="true"></i>
+        </a>
+      </div>
+      <div class="sf-card-body">
+
+        <!-- Daily progress bar -->
+        <div class="d-flex align-items-center gap-3 mb-4">
+          <div class="flex-grow-1">
+            <div class="d-flex justify-content-between mb-1">
+              <span class="sf-badge sf-badge-primary">Daily Progress</span>
+              <span class="text-muted-sf" style="font-size:var(--font-size-xs); font-weight:600;" id="progressPct">37%</span>
+            </div>
+            <div class="sf-progress">
+              <div class="sf-progress-bar" id="dailyProgressBar" style="width:37%;" role="progressbar" aria-valuenow="37" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+          </div>
+          <div class="sf-ring-chart" style="--ring-pct: 37%;">
+            <div class="sf-ring-inner">
+              <strong style="font-size:var(--font-size-sm); color:var(--text-primary);" id="ringPct">37%</strong>
+              <span style="font-size:0.6rem; color:var(--text-muted);">done</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity list (populated by JS / mock data) -->
+        <div id="todayActivitiesList">
+
+          <!-- Activity 1 — completed -->
+          <div class="sf-activity-item">
+            <div class="sf-activity-dot dot-academic" style="background:var(--color-academic);" aria-hidden="true"></div>
+            <div class="sf-activity-content">
+              <div class="sf-activity-title completed">Data Structures Lecture Notes</div>
+              <div class="sf-activity-meta">
+                <span class="sf-badge sf-badge-primary">Academic</span>
+                <span><i class="bi bi-clock" aria-hidden="true"></i> 08:00 – 09:30</span>
+              </div>
+            </div>
+            <div class="sf-activity-time"><span class="sf-badge sf-badge-success"><i class="bi bi-check" aria-hidden="true"></i> Done</span></div>
+          </div>
+
+          <!-- Activity 2 — completed -->
+          <div class="sf-activity-item">
+            <div class="sf-activity-dot" style="background:var(--color-exercise);" aria-hidden="true"></div>
+            <div class="sf-activity-content">
+              <div class="sf-activity-title completed">Morning Jog — 5km</div>
+              <div class="sf-activity-meta">
+                <span class="sf-badge sf-badge-warning">Exercise</span>
+                <span><i class="bi bi-clock" aria-hidden="true"></i> 06:30 – 07:15</span>
+              </div>
+            </div>
+            <div class="sf-activity-time"><span class="sf-badge sf-badge-success"><i class="bi bi-check" aria-hidden="true"></i> Done</span></div>
+          </div>
+
+          <!-- Activity 3 — completed -->
+          <div class="sf-activity-item">
+            <div class="sf-activity-dot" style="background:var(--color-project);" aria-hidden="true"></div>
+            <div class="sf-activity-content">
+              <div class="sf-activity-title completed">React Tutorial — Chapter 5</div>
+              <div class="sf-activity-meta">
+                <span class="sf-badge sf-badge-cyan">Project</span>
+                <span><i class="bi bi-clock" aria-hidden="true"></i> 10:00 – 11:00</span>
+              </div>
+            </div>
+            <div class="sf-activity-time"><span class="sf-badge sf-badge-success"><i class="bi bi-check" aria-hidden="true"></i> Done</span></div>
+          </div>
+
+          <!-- Activity 4 — upcoming -->
+          <div class="sf-activity-item">
+            <div class="sf-activity-dot" style="background:var(--color-academic);" aria-hidden="true"></div>
+            <div class="sf-activity-content">
+              <div class="sf-activity-title">Linear Algebra Problem Set</div>
+              <div class="sf-activity-meta">
+                <span class="sf-badge sf-badge-primary">Academic</span>
+                <span><i class="bi bi-clock" aria-hidden="true"></i> 14:00 – 16:00</span>
+                <span class="sf-priority-dot sf-priority-high" title="High priority" aria-label="High priority"></span>
+              </div>
+            </div>
+            <div class="sf-activity-time"><span class="sf-badge sf-badge-warning">Upcoming</span></div>
+          </div>
+
+          <!-- Activity 5 — upcoming -->
+          <div class="sf-activity-item">
+            <div class="sf-activity-dot" style="background:var(--color-personal);" aria-hidden="true"></div>
+            <div class="sf-activity-content">
+              <div class="sf-activity-title">Python for Data Science — Chapter 3</div>
+              <div class="sf-activity-meta">
+                <span class="sf-badge sf-badge-success">Personal Dev</span>
+                <span><i class="bi bi-clock" aria-hidden="true"></i> 16:30 – 17:30</span>
+              </div>
+            </div>
+            <div class="sf-activity-time"><span class="sf-badge sf-badge-secondary">Pending</span></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly Study Hours Bar Chart -->
+    <div class="sf-card">
+      <div class="sf-card-header">
+        <h2 class="sf-card-title">
+          <i class="bi bi-bar-chart-fill text-primary-color" aria-hidden="true"></i>
+          Weekly Study Hours
+        </h2>
+        <span class="sf-badge sf-badge-primary">This week: 22h</span>
+      </div>
+      <div class="sf-card-body">
+        <div class="sf-bar-chart" id="weeklyBarChart" aria-label="Weekly study hours bar chart">
+          <!-- Bars are rendered by JavaScript -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right column: Quick links + Upcoming + Goals summary -->
+  <div class="col-12 col-lg-4">
+
+    <!-- Quick Actions -->
+    <div class="sf-card mb-4">
+      <div class="sf-card-header">
+        <h2 class="sf-card-title">
+          <i class="bi bi-lightning-fill text-primary-color" aria-hidden="true"></i>
+          Quick Actions
+        </h2>
+      </div>
+      <div class="sf-card-body d-flex flex-column gap-2">
+        <a href="{% url 'myapp:planner' %}" class="sf-btn sf-btn-primary w-100">
+          <i class="bi bi-plus-circle" aria-hidden="true"></i> Add Study Activity
+        </a>
+        <a href="{% url 'myapp:journal' %}" class="sf-btn sf-btn-ghost w-100">
+          <i class="bi bi-pencil-square" aria-hidden="true"></i> Write Journal Entry
+        </a>
+        <a href="{% url 'myapp:schedule' %}" class="sf-btn sf-btn-ghost w-100">
+          <i class="bi bi-calendar-week" aria-hidden="true"></i> View Weekly Schedule
+        </a>
+        <a href="{% url 'myapp:goals' %}" class="sf-btn sf-btn-ghost w-100">
+          <i class="bi bi-trophy" aria-hidden="true"></i> Check Goals Progress
+        </a>
+      </div>
+    </div>
+
+    <!-- Upcoming Activities -->
+    <div class="sf-card mb-4">
+      <div class="sf-card-header">
+        <h2 class="sf-card-title">
+          <i class="bi bi-clock text-primary-color" aria-hidden="true"></i>
+          Upcoming
+        </h2>
+      </div>
+      <div class="sf-card-body">
+        <div class="sf-activity-item">
+          <div class="sf-activity-dot dot-academic" aria-hidden="true"></div>
+          <div class="sf-activity-content">
+            <div class="sf-activity-title" style="font-size:0.8rem;">Algorithms Exam Revision</div>
+            <div class="sf-activity-meta"><i class="bi bi-calendar3" aria-hidden="true"></i> Tomorrow, 09:00</div>
+          </div>
+        </div>
+        <div class="sf-activity-item">
+          <div class="sf-activity-dot" style="background:var(--color-project);" aria-hidden="true"></div>
+          <div class="sf-activity-content">
+            <div class="sf-activity-title" style="font-size:0.8rem;">Portfolio Project — Design</div>
+            <div class="sf-activity-meta"><i class="bi bi-calendar3" aria-hidden="true"></i> Thu, 14:00</div>
+          </div>
+        </div>
+        <div class="sf-activity-item">
+          <div class="sf-activity-dot" style="background:var(--color-leisure);" aria-hidden="true"></div>
+          <div class="sf-activity-content">
+            <div class="sf-activity-title" style="font-size:0.8rem;">Book Club — "Atomic Habits"</div>
+            <div class="sf-activity-meta"><i class="bi bi-calendar3" aria-hidden="true"></i> Fri, 18:00</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Goals Summary -->
+    <div class="sf-card">
+      <div class="sf-card-header">
+        <h2 class="sf-card-title">
+          <i class="bi bi-trophy text-primary-color" aria-hidden="true"></i>
+          Goals Summary
+        </h2>
+        <a href="{% url 'myapp:goals' %}" class="sf-btn sf-btn-ghost sf-btn-sm">All</a>
+      </div>
+      <div class="sf-card-body d-flex flex-column gap-3">
+
+        <div>
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span style="font-size:var(--font-size-xs); font-weight:600; color:var(--text-primary);">
+              <i class="bi bi-mortarboard text-primary-color" aria-hidden="true"></i> Dean's List
+            </span>
+            <span style="font-size:var(--font-size-xs); color:var(--text-muted);">72%</span>
+          </div>
+          <div class="sf-progress"><div class="sf-progress-bar" style="width:72%;"></div></div>
+        </div>
+
+        <div>
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span style="font-size:var(--font-size-xs); font-weight:600; color:var(--text-primary);">
+              <i class="bi bi-code-slash" style="color:var(--color-secondary);" aria-hidden="true"></i> Build Portfolio
+            </span>
+            <span style="font-size:var(--font-size-xs); color:var(--text-muted);">45%</span>
+          </div>
+          <div class="sf-progress"><div class="sf-progress-bar" style="width:45%; background:linear-gradient(90deg,var(--color-secondary),#67e8f9);"></div></div>
+        </div>
+
+        <div>
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span style="font-size:var(--font-size-xs); font-weight:600; color:var(--text-primary);">
+              <i class="bi bi-activity" style="color:var(--color-warning);" aria-hidden="true"></i> Fitness Goal
+            </span>
+            <span style="font-size:var(--font-size-xs); color:var(--text-muted);">60%</span>
+          </div>
+          <div class="sf-progress"><div class="sf-progress-bar warning" style="width:60%;"></div></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* -------------------------------------------------------
+   Dashboard JavaScript
+   Handles the welcome greeting, bar chart rendering,
+   and motivational quote rotation.
+   ------------------------------------------------------- */
+
+document.addEventListener('DOMContentLoaded', () => {
+
+  /* ---- 1. Personalised greeting based on time of day ---- */
+  const greetingEl = document.getElementById('welcomeHeading');
+  if (greetingEl) {
+    const hour = new Date().getHours();
+    let greeting = 'Good evening';
+    if (hour < 12)      greeting = 'Good morning';
+    else if (hour < 17) greeting = 'Good afternoon';
+    greetingEl.textContent = `${greeting}, Alex! 👋`;
+  }
+
+  /* ---- 2. Motivational quotes (rotated daily) ---- */
+  const quotes = [
+    { text: '"An investment in knowledge pays the best interest."', author: 'Benjamin Franklin' },
+    { text: '"The secret of getting ahead is getting started."',   author: 'Mark Twain' },
+    { text: '"Education is the most powerful weapon."',            author: 'Nelson Mandela' },
+    { text: '"Success is the sum of small efforts repeated."',     author: 'Robert Collier' },
+    { text: '"Learning never exhausts the mind."',                 author: 'Leonardo da Vinci' },
+    { text: '"It always seems impossible until it is done."',      author: 'Nelson Mandela' },
+    { text: '"Discipline is the bridge between goals and accomplishment."', author: 'Jim Rohn' },
+  ];
+
+  const quoteEl = document.getElementById('motivationalQuote');
+  if (quoteEl) {
+    // Pick a quote based on today's day-of-year so it changes daily
+    const dayOfYear = Math.floor(
+      (new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000
+    );
+    const q = quotes[dayOfYear % quotes.length];
+    quoteEl.textContent = `${q.text} — ${q.author}`;
+  }
+
+  /* ---- 3. Weekly bar chart ---- */
+  const weeklyData = [
+    { day: 'Mon', hours: 5.0, today: false },
+    { day: 'Tue', hours: 3.5, today: false },
+    { day: 'Wed', hours: 6.0, today: false },
+    { day: 'Thu', hours: 4.0, today: false },
+    { day: 'Fri', hours: 4.5, today: true  },  // today
+    { day: 'Sat', hours: 0.0, today: false },
+    { day: 'Sun', hours: 0.0, today: false },
+  ];
+
+  const chartContainer = document.getElementById('weeklyBarChart');
+  if (chartContainer) {
+    // The max hours helps us calculate bar height as a percentage
+    const maxHours = Math.max(...weeklyData.map(d => d.hours), 1);
+
+    weeklyData.forEach(item => {
+      const heightPct = (item.hours / maxHours) * 100;
+      const col = document.createElement('div');
+      col.className = 'sf-bar-col';
+      col.innerHTML = `
+        <div class="sf-bar-value">${item.hours > 0 ? item.hours + 'h' : ''}</div>
+        <div class="sf-bar ${item.today ? 'today' : ''}"
+             style="height: ${heightPct}%;"
+             role="img"
+             aria-label="${item.day}: ${item.hours} study hours">
+        </div>
+        <div class="sf-bar-label">${item.day}</div>
+      `;
+      chartContainer.appendChild(col);
+    });
+  }
+
+});
+</script>
+{% endblock %}

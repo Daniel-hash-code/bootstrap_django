@@ -1,0 +1,47 @@
+# ============================================================
+# StudyFlow — .gitignore
+# ============================================================
+
+# Python virtual environment — never commit this
+venv/
+.venv/
+env/
+ENV/
+
+# Python byte-code and cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyc
+*.pyd
+
+# Django specific
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE and editor folders
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Node (if ever used for tooling)
+node_modules/
+
+# Coverage / test output
+htmlcov/
+.coverage
+.pytest_cache/

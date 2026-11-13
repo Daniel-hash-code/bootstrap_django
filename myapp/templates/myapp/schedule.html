@@ -1,0 +1,486 @@
+{% extends "myapp/base.html" %}
+{% load static %}
+
+{% block title %}Schedule — StudyFlow{% endblock %}
+
+{% block topbar_title %}
+  <div>
+    Schedule
+    <div class="sf-topbar-subtitle" id="currentDateDisplay"></div>
+  </div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Page Header + View Toggle -->
+<div class="sf-page-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+  <div>
+    <h1 class="sf-page-title">Personal Schedule</h1>
+    <p class="sf-page-subtitle">Your daily and weekly activity overview.</p>
+  </div>
+  <!-- Day / Week view toggle -->
+  <div class="btn-group" role="group" aria-label="Schedule view">
+    <button type="button" class="btn btn-outline-primary active" id="btnDayView">
+      <i class="bi bi-calendar-day me-1" aria-hidden="true"></i> Day View
+    </button>
+    <button type="button" class="btn btn-outline-primary" id="btnWeekView">
+      <i class="bi bi-calendar-week me-1" aria-hidden="true"></i> Week View
+    </button>
+  </div>
+</div>
+
+<!-- Date navigation -->
+<div class="sf-card mb-4">
+  <div class="sf-card-body d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <button class="sf-btn sf-btn-ghost" id="prevDay" aria-label="Previous day">
+      <i class="bi bi-chevron-left" aria-hidden="true"></i>
+    </button>
+    <div class="text-center">
+      <div style="font-size:var(--font-size-lg); font-weight:700; color:var(--text-primary);" id="scheduleDate">Today</div>
+      <div style="font-size:var(--font-size-xs); color:var(--text-muted);" id="scheduleDateFull"></div>
+    </div>
+    <button class="sf-btn sf-btn-ghost" id="nextDay" aria-label="Next day">
+      <i class="bi bi-chevron-right" aria-hidden="true"></i>
+    </button>
+  </div>
+</div>
+
+<!-- Category Legend -->
+<div class="d-flex flex-wrap gap-3 mb-4">
+  <span class="d-flex align-items-center gap-1" style="font-size:var(--font-size-xs); font-weight:600;">
+    <span style="width:12px;height:12px;border-radius:3px;background:var(--color-academic);display:inline-block;"></span> Academic
+  </span>
+  <span class="d-flex align-items-center gap-1" style="font-size:var(--font-size-xs); font-weight:600;">
+    <span style="width:12px;height:12px;border-radius:3px;background:var(--color-personal);display:inline-block;"></span> Personal Dev
+  </span>
+  <span class="d-flex align-items-center gap-1" style="font-size:var(--font-size-xs); font-weight:600;">
+    <span style="width:12px;height:12px;border-radius:3px;background:var(--color-exercise);display:inline-block;"></span> Exercise
+  </span>
+  <span class="d-flex align-items-center gap-1" style="font-size:var(--font-size-xs); font-weight:600;">
+    <span style="width:12px;height:12px;border-radius:3px;background:var(--color-project);display:inline-block;"></span> Project
+  </span>
+  <span class="d-flex align-items-center gap-1" style="font-size:var(--font-size-xs); font-weight:600;">
+    <span style="width:12px;height:12px;border-radius:3px;background:var(--color-leisure);display:inline-block;"></span> Leisure
+  </span>
+</div>
+
+<!-- ── DAY VIEW ── -->
+<div id="dayView">
+  <div class="sf-card">
+    <div class="sf-card-header">
+      <h2 class="sf-card-title">
+        <i class="bi bi-clock text-primary-color" aria-hidden="true"></i>
+        Day Schedule
+      </h2>
+      <span class="sf-badge sf-badge-primary" id="dayActivityCount">0 activities</span>
+    </div>
+    <div class="sf-card-body" id="dayScheduleContainer">
+      <!-- Rendered by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- ── WEEK VIEW (hidden by default) ── -->
+<div id="weekView" style="display:none;">
+  <div class="sf-card">
+    <div class="sf-card-header">
+      <h2 class="sf-card-title">
+        <i class="bi bi-calendar3 text-primary-color" aria-hidden="true"></i>
+        Weekly Overview
+      </h2>
+    </div>
+    <div class="sf-card-body">
+      <div style="overflow-x:auto;">
+        <div id="weekGridContainer">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upcoming events this week -->
+  <div class="row g-4 mt-1">
+    <div class="col-12 col-md-6">
+      <div class="sf-card">
+        <div class="sf-card-header">
+          <h3 class="sf-card-title">
+            <i class="bi bi-stars text-primary-color" aria-hidden="true"></i> Highlights This Week
+          </h3>
+        </div>
+        <div class="sf-card-body" id="weekHighlights">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6">
+      <div class="sf-card">
+        <div class="sf-card-header">
+          <h3 class="sf-card-title">
+            <i class="bi bi-pie-chart text-primary-color" aria-hidden="true"></i> Time Distribution
+          </h3>
+        </div>
+        <div class="sf-card-body" id="timeDistribution">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* =============================================================
+   Schedule Page JavaScript
+   Renders a day view (time slots) and a week view (grid).
+   All data is mock/sample — no backend involved.
+   ============================================================= */
+
+/* ---- MOCK schedule data ---- */
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+function offsetDate(days) {
+  const d = new Date(); d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+const SCHEDULE_DATA = [
+  { id: 1, title: 'Morning Jog',              category: 'exercise', start: '06:30', end: '07:15', date: todayStr() },
+  { id: 2, title: 'Data Structures Lecture',  category: 'academic', start: '08:00', end: '09:30', date: todayStr() },
+  { id: 3, title: 'React Tutorial Ch.5',      category: 'project',  start: '10:00', end: '11:00', date: todayStr() },
+  { id: 4, title: 'Lunch Break',              category: 'leisure',  start: '12:00', end: '13:00', date: todayStr() },
+  { id: 5, title: 'Linear Algebra Set',       category: 'academic', start: '14:00', end: '16:00', date: todayStr() },
+  { id: 6, title: 'Python Data Science',      category: 'personal', start: '16:30', end: '17:30', date: todayStr() },
+  { id: 7, title: 'Evening Walk',             category: 'exercise', start: '18:30', end: '19:00', date: todayStr() },
+  { id: 8, title: 'Journaling & Reflection',  category: 'journal',  start: '21:00', end: '21:30', date: todayStr() },
+
+  { id: 9,  title: 'Algorithms Revision',     category: 'academic', start: '09:00', end: '12:00', date: offsetDate(1) },
+  { id: 10, title: 'Gym Session',             category: 'exercise', start: '06:00', end: '07:00', date: offsetDate(1) },
+  { id: 11, title: 'OS Lecture',              category: 'academic', start: '14:00', end: '15:30', date: offsetDate(1) },
+  { id: 12, title: 'Portfolio Mockups',       category: 'project',  start: '14:00', end: '16:00', date: offsetDate(2) },
+  { id: 13, title: 'Statistics Assignment',   category: 'academic', start: '10:00', end: '12:00', date: offsetDate(2) },
+  { id: 14, title: 'Photography Hobby',       category: 'leisure',  start: '15:00', end: '17:00', date: offsetDate(2) },
+  { id: 15, title: 'Book Club',               category: 'leisure',  start: '18:00', end: '19:30', date: offsetDate(3) },
+  { id: 16, title: 'AWS Cert Study',          category: 'personal', start: '20:00', end: '21:30', date: offsetDate(3) },
+];
+
+const TIME_SLOTS = [
+  '06:00','07:00','08:00','09:00','10:00','11:00','12:00',
+  '13:00','14:00','15:00','16:00','17:00','18:00','19:00',
+  '20:00','21:00','22:00',
+];
+
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAYS_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+let currentDate = new Date();
+let activeView  = 'day';
+
+/* ---- Render day view ---- */
+function renderDayView() {
+  const dateStr  = currentDate.toISOString().split('T')[0];
+  const dayItems = SCHEDULE_DATA.filter(e => e.date === dateStr);
+  const container = document.getElementById('dayScheduleContainer');
+  const countBadge = document.getElementById('dayActivityCount');
+
+  countBadge.textContent = `${dayItems.length} ${dayItems.length === 1 ? 'activity' : 'activities'}`;
+
+  if (dayItems.length === 0) {
+    container.innerHTML = `
+      <div class="sf-empty-state">
+        <div class="sf-empty-icon"><i class="bi bi-calendar-x" aria-hidden="true"></i></div>
+        <div class="sf-empty-title">No activities scheduled</div>
+        <p class="sf-empty-text">Use the Study Planner to add activities for this day.</p>
+      </div>`;
+    return;
+  }
+
+  // Sort by start time
+  const sorted = [...dayItems].sort((a, b) => a.start.localeCompare(b.start));
+
+  container.innerHTML = '';
+
+  TIME_SLOTS.forEach(slot => {
+    const slotActivities = sorted.filter(e => e.start >= slot && e.start < nextHour(slot));
+
+    // Always show occupied time slots; show empty slots only if adjacent to activity
+    if (slotActivities.length === 0) return;
+
+    const slotDiv = document.createElement('div');
+    slotDiv.className = 'sf-time-slot';
+
+    const timeLabel = document.createElement('div');
+    timeLabel.className = 'sf-time-label';
+    timeLabel.setAttribute('aria-hidden', 'true');
+    timeLabel.textContent = formatHour(slot);
+
+    const blocksDiv = document.createElement('div');
+    blocksDiv.style.flex = '1';
+
+    slotActivities.forEach(evt => {
+      const block = document.createElement('div');
+      block.className = `sf-schedule-block ${evt.category}`;
+      block.innerHTML = `
+        <div style="font-weight:700; margin-bottom:2px;">${evt.title}</div>
+        <div style="font-size:var(--font-size-xs); opacity:0.85;">
+          <i class="bi bi-clock" aria-hidden="true"></i>
+          ${formatTimeStr(evt.start)} – ${formatTimeStr(evt.end)}
+        </div>`;
+      block.setAttribute('role', 'article');
+      block.setAttribute('aria-label', `${evt.title} from ${formatTimeStr(evt.start)} to ${formatTimeStr(evt.end)}`);
+      blocksDiv.appendChild(block);
+    });
+
+    slotDiv.appendChild(timeLabel);
+    slotDiv.appendChild(blocksDiv);
+    container.appendChild(slotDiv);
+  });
+}
+
+function nextHour(timeStr) {
+  const [h] = timeStr.split(':').map(Number);
+  return String(h + 1).padStart(2, '0') + ':00';
+}
+
+function formatHour(timeStr) {
+  const [h] = timeStr.split(':').map(Number);
+  if (h === 0)  return '12 AM';
+  if (h < 12)   return `${h} AM`;
+  if (h === 12) return '12 PM';
+  return `${h - 12} PM`;
+}
+
+function formatTimeStr(str) {
+  const [h, m] = str.split(':').map(Number);
+  const p  = h >= 12 ? 'PM' : 'AM';
+  const hh = h % 12 || 12;
+  return `${hh}:${String(m).padStart(2,'0')} ${p}`;
+}
+
+/* ---- Render week view ---- */
+function renderWeekView() {
+  // Find start of this week (Monday)
+  const today   = new Date();
+  const dow     = today.getDay();
+  const monday  = new Date(today);
+  monday.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return { date: d, str: d.toISOString().split('T')[0] };
+  });
+
+  const container = document.getElementById('weekGridContainer');
+  container.innerHTML = '';
+
+  // Header row
+  const grid = document.createElement('div');
+  grid.className = 'sf-week-grid';
+  grid.setAttribute('role', 'table');
+  grid.setAttribute('aria-label', 'Weekly schedule grid');
+
+  // Time column header
+  const timeHeader = document.createElement('div');
+  timeHeader.className = 'sf-week-header';
+  timeHeader.textContent = '';
+  grid.appendChild(timeHeader);
+
+  weekDays.forEach(day => {
+    const isToday = day.str === new Date().toISOString().split('T')[0];
+    const header = document.createElement('div');
+    header.className = 'sf-week-header';
+    header.style.cssText = isToday
+      ? 'background:var(--color-primary); color:white;'
+      : '';
+    header.innerHTML = `
+      <div>${DAYS[day.date.getDay()]}</div>
+      <div style="font-size:1.1rem; font-weight:700;">${day.date.getDate()}</div>`;
+    grid.appendChild(header);
+  });
+
+  // Time slot rows
+  TIME_SLOTS.forEach(slot => {
+    // Time label
+    const label = document.createElement('div');
+    label.className = 'sf-week-cell sf-week-header';
+    label.style.cssText = 'font-size:0.6rem; padding:4px 6px; min-height:48px;';
+    label.textContent = formatHour(slot);
+    grid.appendChild(label);
+
+    // Day cells
+    weekDays.forEach(day => {
+      const cell = document.createElement('div');
+      cell.className = 'sf-week-cell';
+      cell.style.minHeight = '48px';
+
+      const events = SCHEDULE_DATA.filter(e =>
+        e.date === day.str && e.start >= slot && e.start < nextHour(slot)
+      );
+
+      events.forEach(evt => {
+        const chip = document.createElement('div');
+        chip.className = `sf-schedule-block ${evt.category}`;
+        chip.style.cssText = 'padding:3px 6px; font-size:0.6rem; margin-bottom:2px;';
+        chip.textContent = evt.title;
+        chip.title = `${evt.title} (${formatTimeStr(evt.start)}–${formatTimeStr(evt.end)})`;
+        cell.appendChild(chip);
+      });
+
+      grid.appendChild(cell);
+    });
+  });
+
+  container.appendChild(grid);
+
+  // Render highlights
+  renderWeekHighlights(weekDays);
+  renderTimeDistribution(weekDays);
+}
+
+function renderWeekHighlights(weekDays) {
+  const container = document.getElementById('weekHighlights');
+  container.innerHTML = '';
+  const weekStrs = weekDays.map(d => d.str);
+  const events = SCHEDULE_DATA
+    .filter(e => weekStrs.includes(e.date))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start))
+    .slice(0, 6);
+
+  if (events.length === 0) {
+    container.innerHTML = '<p class="sf-empty-text">No events this week.</p>';
+    return;
+  }
+
+  events.forEach(evt => {
+    const d = new Date(evt.date + 'T00:00:00');
+    const item = document.createElement('div');
+    item.className = 'sf-activity-item';
+    item.innerHTML = `
+      <div class="sf-activity-dot ${evt.category}" style="background:var(--color-${evt.category}, var(--color-primary));"></div>
+      <div class="sf-activity-content">
+        <div class="sf-activity-title" style="font-size:var(--font-size-xs);">${evt.title}</div>
+        <div class="sf-activity-meta">
+          ${DAYS_FULL[d.getDay()]}, ${formatTimeStr(evt.start)}
+        </div>
+      </div>`;
+    container.appendChild(item);
+  });
+}
+
+function renderTimeDistribution(weekDays) {
+  const container = document.getElementById('timeDistribution');
+  const weekStrs  = weekDays.map(d => d.str);
+  const events    = SCHEDULE_DATA.filter(e => weekStrs.includes(e.date));
+
+  // Count minutes per category
+  const totals = {};
+  events.forEach(evt => {
+    const mins = timeDiffMins(evt.start, evt.end);
+    totals[evt.category] = (totals[evt.category] || 0) + mins;
+  });
+
+  const catConfig = {
+    academic: { label: 'Academic',    color: 'var(--color-academic)' },
+    personal: { label: 'Personal Dev',color: 'var(--color-personal)' },
+    project:  { label: 'Project',     color: 'var(--color-project)'  },
+    exercise: { label: 'Exercise',    color: 'var(--color-exercise)' },
+    leisure:  { label: 'Leisure',     color: 'var(--color-leisure)'  },
+    journal:  { label: 'Journal',     color: 'var(--color-journal)'  },
+  };
+
+  const totalMins = Object.values(totals).reduce((a, b) => a + b, 0) || 1;
+
+  container.innerHTML = '<div class="d-flex flex-column gap-3">' +
+    Object.entries(totals)
+      .sort(([,a],[,b]) => b - a)
+      .map(([cat, mins]) => {
+        const cfg = catConfig[cat] || { label: cat, color: 'var(--color-primary)' };
+        const pct = Math.round((mins / totalMins) * 100);
+        const hrs = (mins / 60).toFixed(1);
+        return `
+          <div>
+            <div class="d-flex justify-content-between mb-1">
+              <span style="font-size:var(--font-size-xs); font-weight:600; color:var(--text-primary);">${cfg.label}</span>
+              <span style="font-size:var(--font-size-xs); color:var(--text-muted);">${hrs}h (${pct}%)</span>
+            </div>
+            <div class="sf-progress">
+              <div class="sf-progress-bar" style="width:${pct}%; background:${cfg.color};"></div>
+            </div>
+          </div>`;
+      }).join('')
+    + '</div>';
+}
+
+function timeDiffMins(start, end) {
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  return Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+}
+
+/* ---- Date navigation ---- */
+function updateDateDisplay() {
+  const today = new Date().toISOString().split('T')[0];
+  const str   = currentDate.toISOString().split('T')[0];
+  const dateEl    = document.getElementById('scheduleDate');
+  const dateFull  = document.getElementById('scheduleDateFull');
+
+  if (str === today) {
+    dateEl.textContent = 'Today';
+  } else {
+    dateEl.textContent = DAYS_FULL[currentDate.getDay()];
+  }
+  dateFull.textContent = currentDate.toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  });
+}
+
+function refreshView() {
+  updateDateDisplay();
+  if (activeView === 'day') renderDayView();
+  else renderWeekView();
+}
+
+/* ---- WIRE UP ---- */
+document.addEventListener('DOMContentLoaded', () => {
+
+  updateDateDisplay();
+  renderDayView();
+
+  document.getElementById('prevDay').addEventListener('click', () => {
+    currentDate.setDate(currentDate.getDate() - 1);
+    refreshView();
+  });
+
+  document.getElementById('nextDay').addEventListener('click', () => {
+    currentDate.setDate(currentDate.getDate() + 1);
+    refreshView();
+  });
+
+  document.getElementById('btnDayView').addEventListener('click', () => {
+    activeView = 'day';
+    document.getElementById('dayView').style.display  = '';
+    document.getElementById('weekView').style.display = 'none';
+    document.getElementById('btnDayView').classList.add('active');
+    document.getElementById('btnWeekView').classList.remove('active');
+    document.getElementById('prevDay').style.display  = '';
+    document.getElementById('nextDay').style.display  = '';
+    renderDayView();
+  });
+
+  document.getElementById('btnWeekView').addEventListener('click', () => {
+    activeView = 'week';
+    document.getElementById('dayView').style.display  = 'none';
+    document.getElementById('weekView').style.display = '';
+    document.getElementById('btnWeekView').classList.add('active');
+    document.getElementById('btnDayView').classList.remove('active');
+    document.getElementById('prevDay').style.display  = 'none';
+    document.getElementById('nextDay').style.display  = 'none';
+    renderWeekView();
+  });
+
+});
+</script>
+{% endblock %}
